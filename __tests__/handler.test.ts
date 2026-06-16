@@ -1,10 +1,123 @@
-import * as github from '@actions/github'
 import * as core from '@actions/core'
-import { Context } from '@actions/github/lib/context'
+import type * as githubTypes from '@actions/github' with {
+  'resolution-mode': 'import',
+}
 import * as handler from '../src/handler'
 
+type Context = typeof githubTypes.context
+
 jest.mock('@actions/core')
-jest.mock('@actions/github')
+jest.mock('@actions/github', () => ({
+  context: {},
+  getOctokit: jest.fn(),
+}))
+
+const github = jest.requireMock('@actions/github') as {
+  context: any
+  getOctokit: jest.Mock
+}
+
+describe('handleEvent', () => {
+  test('routes pull request payloads through pull request behavior', async () => {
+    ;(github.getOctokit as jest.Mock).mockImplementation(() => ({
+      rest: {
+        pulls: {
+          requestReviewers: async (_request: any) => {},
+        },
+        issues: {
+          addAssignees: async (_request: any) => {},
+        },
+      },
+    }))
+
+    const context = {
+      eventName: 'pull_request',
+      payload: {
+        pull_request: {
+          number: 1,
+          labels: [],
+          title: 'test',
+          user: { login: 'pr-creator' },
+        },
+      },
+      issue: { owner: 'kentaro-m', repo: 'auto-assign', number: 1 },
+    } as unknown as Context
+    const client = github.getOctokit('token')
+    const requestReviewersSpy = jest.spyOn(
+      client.rest.pulls,
+      'requestReviewers'
+    )
+
+    await handler.handleEvent(client, context, {
+      addAssignees: false,
+      addReviewers: true,
+      numberOfReviewers: 0,
+      reviewers: ['reviewer1', 'pr-creator'],
+    } as any)
+
+    expect(requestReviewersSpy.mock.calls[0][0]?.reviewers).toEqual([
+      'reviewer1',
+    ])
+  })
+
+  test('routes issue payloads through issue behavior', async () => {
+    ;(github.getOctokit as jest.Mock).mockImplementation(() => ({
+      rest: {
+        pulls: {
+          requestReviewers: async (_request: any) => {},
+        },
+        issues: {
+          addAssignees: async (_request: any) => {},
+        },
+      },
+    }))
+
+    const context = {
+      eventName: 'issues',
+      payload: {
+        issue: {
+          number: 2,
+          labels: [],
+          title: 'issue test',
+          user: { login: 'issue-creator' },
+        },
+      },
+      issue: { owner: 'kentaro-m', repo: 'auto-assign', number: 2 },
+    } as unknown as Context
+    const client = github.getOctokit('token')
+    const addAssigneesSpy = jest.spyOn(client.rest.issues, 'addAssignees')
+
+    await handler.handleEvent(client, context, {
+      addAssignees: 'author',
+      addReviewers: true,
+      reviewers: ['reviewer1'],
+    } as any)
+
+    expect(addAssigneesSpy.mock.calls[0][0]?.assignees).toEqual([
+      'issue-creator',
+    ])
+  })
+
+  test('rejects unsupported events even when they include an issue payload', async () => {
+    const context = {
+      eventName: 'issue_comment',
+      payload: {
+        issue: {
+          number: 3,
+          labels: [],
+          title: 'commented issue',
+          user: { login: 'issue-creator' },
+        },
+      },
+      issue: { owner: 'kentaro-m', repo: 'auto-assign', number: 3 },
+    } as unknown as Context
+    const client = github.getOctokit('token')
+
+    await expect(
+      handler.handleEvent(client, context, { addAssignees: 'author' } as any)
+    ).rejects.toThrow('unsupported event: issue_comment')
+  })
+})
 
 describe('handlePullRequest', () => {
   let context: Context
@@ -94,10 +207,10 @@ describe('handlePullRequest', () => {
     ;(github.getOctokit as jest.Mock).mockImplementation(() => ({
       rest: {
         pulls: {
-          requestReviewers: async () => {},
+          requestReviewers: async (_request: any) => {},
         },
         issues: {
-          addAssignees: async () => {},
+          addAssignees: async (_request: any) => {},
         },
       },
     }))
@@ -131,10 +244,10 @@ describe('handlePullRequest', () => {
     ;(github.getOctokit as jest.Mock).mockImplementation(() => ({
       rest: {
         pulls: {
-          requestReviewers: async () => {},
+          requestReviewers: async (_request: any) => {},
         },
         issues: {
-          addAssignees: async () => {},
+          addAssignees: async (_request: any) => {},
         },
       },
     }))
@@ -169,10 +282,10 @@ describe('handlePullRequest', () => {
     ;(github.getOctokit as jest.Mock).mockImplementation(() => ({
       rest: {
         pulls: {
-          requestReviewers: async () => {},
+          requestReviewers: async (_request: any) => {},
         },
         issues: {
-          addAssignees: async () => {},
+          addAssignees: async (_request: any) => {},
         },
       },
     }))
@@ -206,10 +319,10 @@ describe('handlePullRequest', () => {
     ;(github.getOctokit as jest.Mock).mockImplementation(() => ({
       rest: {
         pulls: {
-          requestReviewers: async () => {},
+          requestReviewers: async (_request: any) => {},
         },
         issues: {
-          addAssignees: async () => {},
+          addAssignees: async (_request: any) => {},
         },
       },
     }))
@@ -235,10 +348,10 @@ describe('handlePullRequest', () => {
     ;(github.getOctokit as jest.Mock).mockImplementation(() => ({
       rest: {
         pulls: {
-          requestReviewers: async () => {},
+          requestReviewers: async (_request: any) => {},
         },
         issues: {
-          addAssignees: async () => {},
+          addAssignees: async (_request: any) => {},
         },
       },
     }))
@@ -274,10 +387,10 @@ describe('handlePullRequest', () => {
     ;(github.getOctokit as jest.Mock).mockImplementation(() => ({
       rest: {
         pulls: {
-          requestReviewers: async () => {},
+          requestReviewers: async (_request: any) => {},
         },
         issues: {
-          addAssignees: async () => {},
+          addAssignees: async (_request: any) => {},
         },
       },
     }))
@@ -314,10 +427,10 @@ describe('handlePullRequest', () => {
     ;(github.getOctokit as jest.Mock).mockImplementation(() => ({
       rest: {
         pulls: {
-          requestReviewers: async () => {},
+          requestReviewers: async (_request: any) => {},
         },
         issues: {
-          addAssignees: async () => {},
+          addAssignees: async (_request: any) => {},
         },
       },
     }))
@@ -354,10 +467,10 @@ describe('handlePullRequest', () => {
     ;(github.getOctokit as jest.Mock).mockImplementation(() => ({
       rest: {
         pulls: {
-          requestReviewers: async () => {},
+          requestReviewers: async (_request: any) => {},
         },
         issues: {
-          addAssignees: async () => {},
+          addAssignees: async (_request: any) => {},
         },
       },
     }))
@@ -389,14 +502,14 @@ describe('handlePullRequest', () => {
     ;(github.getOctokit as jest.Mock).mockImplementation(() => ({
       rest: {
         pulls: {
-          requestReviewers: async () => {
+          requestReviewers: async (_request: any) => {
             throw new Error(
               'Review cannot be requested from pull request author.'
             )
           },
         },
         issues: {
-          addAssignees: async () => {},
+          addAssignees: async (_request: any) => {},
         },
       },
     }))
@@ -425,10 +538,10 @@ describe('handlePullRequest', () => {
     ;(github.getOctokit as jest.Mock).mockImplementation(() => ({
       rest: {
         pulls: {
-          requestReviewers: async () => {},
+          requestReviewers: async (_request: any) => {},
         },
         issues: {
-          addAssignees: async () => {
+          addAssignees: async (_request: any) => {
             throw new Error('failed to add assignees.')
           },
         },
@@ -513,10 +626,10 @@ describe('handlePullRequest', () => {
     ;(github.getOctokit as jest.Mock).mockImplementation(() => ({
       rest: {
         pulls: {
-          requestReviewers: async () => {},
+          requestReviewers: async (_request: any) => {},
         },
         issues: {
-          addAssignees: async () => {},
+          addAssignees: async (_request: any) => {},
         },
       },
     }))
@@ -556,10 +669,10 @@ describe('handlePullRequest', () => {
     ;(github.getOctokit as jest.Mock).mockImplementation(() => ({
       rest: {
         pulls: {
-          requestReviewers: async () => {},
+          requestReviewers: async (_request: any) => {},
         },
         issues: {
-          addAssignees: async () => {},
+          addAssignees: async (_request: any) => {},
         },
       },
     }))
@@ -604,10 +717,10 @@ describe('handlePullRequest', () => {
     ;(github.getOctokit as jest.Mock).mockImplementation(() => ({
       rest: {
         pulls: {
-          requestReviewers: async () => {},
+          requestReviewers: async (_request: any) => {},
         },
         issues: {
-          addAssignees: async () => {},
+          addAssignees: async (_request: any) => {},
         },
       },
     }))
@@ -655,10 +768,10 @@ describe('handlePullRequest', () => {
     ;(github.getOctokit as jest.Mock).mockImplementation(() => ({
       rest: {
         pulls: {
-          requestReviewers: async () => {},
+          requestReviewers: async (_request: any) => {},
         },
         issues: {
-          addAssignees: async () => {},
+          addAssignees: async (_request: any) => {},
         },
       },
     }))
@@ -703,10 +816,10 @@ describe('handlePullRequest', () => {
     ;(github.getOctokit as jest.Mock).mockImplementation(() => ({
       rest: {
         pulls: {
-          requestReviewers: async () => {},
+          requestReviewers: async (_request: any) => {},
         },
         issues: {
-          addAssignees: async () => {},
+          addAssignees: async (_request: any) => {},
         },
       },
     }))
@@ -750,10 +863,10 @@ describe('handlePullRequest', () => {
     ;(github.getOctokit as jest.Mock).mockImplementation(() => ({
       rest: {
         pulls: {
-          requestReviewers: async () => {},
+          requestReviewers: async (_request: any) => {},
         },
         issues: {
-          addAssignees: async () => {},
+          addAssignees: async (_request: any) => {},
         },
       },
     }))
@@ -797,10 +910,10 @@ describe('handlePullRequest', () => {
     ;(github.getOctokit as jest.Mock).mockImplementation(() => ({
       rest: {
         pulls: {
-          requestReviewers: async () => {},
+          requestReviewers: async (_request: any) => {},
         },
         issues: {
-          addAssignees: async () => {},
+          addAssignees: async (_request: any) => {},
         },
       },
     }))
@@ -852,10 +965,10 @@ describe('handlePullRequest', () => {
     ;(github.getOctokit as jest.Mock).mockImplementation(() => ({
       rest: {
         pulls: {
-          requestReviewers: async () => {},
+          requestReviewers: async (_request: any) => {},
         },
         issues: {
-          addAssignees: async () => {},
+          addAssignees: async (_request: any) => {},
         },
       },
     }))
@@ -945,10 +1058,10 @@ describe('handlePullRequest', () => {
     ;(github.getOctokit as jest.Mock).mockImplementation(() => ({
       rest: {
         pulls: {
-          requestReviewers: async () => {},
+          requestReviewers: async (_request: any) => {},
         },
         issues: {
-          addAssignees: async () => {},
+          addAssignees: async (_request: any) => {},
         },
       },
     }))
@@ -978,5 +1091,282 @@ describe('handlePullRequest', () => {
     expect(requestReviewersSpy.mock.calls[0][0]?.reviewers![0]).toMatch(
       /reviewer/
     )
+  })
+})
+
+describe('handleIssue', () => {
+  let context: Context
+
+  beforeEach(() => {
+    context = {
+      eventName: 'issues',
+      workflow: '',
+      action: '',
+      actor: '',
+      payload: {
+        action: 'opened',
+        issue: {
+          number: 2,
+          labels: [],
+          title: 'issue test',
+          user: {
+            login: 'issue-creator',
+          },
+        },
+        repository: {
+          name: 'auto-assign',
+          owner: {
+            login: 'kentaro-m',
+          },
+        },
+      },
+      repo: {
+        owner: 'kentaro-m',
+        repo: 'auto-assign',
+      },
+      issue: {
+        owner: 'kentaro-m',
+        repo: 'auto-assign',
+        number: 2,
+      },
+      sha: '',
+      ref: '',
+    } as unknown as Context
+  })
+
+  test('adds issue creator as assignee when addAssignees is set to author', async () => {
+    ;(github.getOctokit as jest.Mock).mockImplementation(() => ({
+      rest: {
+        pulls: {
+          requestReviewers: async (_request: any) => {},
+        },
+        issues: {
+          addAssignees: async (_request: any) => {},
+        },
+      },
+    }))
+
+    const client = github.getOctokit('token')
+    const requestReviewersSpy = jest.spyOn(
+      client.rest.pulls,
+      'requestReviewers'
+    )
+    const addAssigneesSpy = jest.spyOn(client.rest.issues, 'addAssignees')
+
+    await handler.handleIssue(client, context, {
+      addAssignees: 'author',
+      addReviewers: true,
+    } as any)
+
+    expect(addAssigneesSpy.mock.calls[0][0]).toEqual({
+      owner: 'kentaro-m',
+      repo: 'auto-assign',
+      issue_number: 2,
+      assignees: ['issue-creator'],
+    })
+    expect(requestReviewersSpy).not.toBeCalled()
+  })
+
+  test('ignores reviewer-only settings for issues and adds configured assignees', async () => {
+    ;(github.getOctokit as jest.Mock).mockImplementation(() => ({
+      rest: {
+        pulls: {
+          requestReviewers: async (_request: any) => {},
+        },
+        issues: {
+          addAssignees: async (_request: any) => {},
+        },
+      },
+    }))
+
+    const client = github.getOctokit('token')
+    const requestReviewersSpy = jest.spyOn(
+      client.rest.pulls,
+      'requestReviewers'
+    )
+    const addAssigneesSpy = jest.spyOn(client.rest.issues, 'addAssignees')
+
+    await handler.handleIssue(client, context, {
+      addAssignees: true,
+      addReviewers: true,
+      useReviewGroups: true,
+      assignees: ['assignee1', 'issue-creator'],
+      numberOfAssignees: 0,
+      reviewers: ['reviewer1'],
+      numberOfReviewers: 1,
+    } as any)
+
+    expect(addAssigneesSpy.mock.calls[0][0]?.assignees).toEqual(['assignee1'])
+    expect(requestReviewersSpy).not.toBeCalled()
+  })
+
+  test('no-ops successfully for issues when addAssignees is false', async () => {
+    ;(github.getOctokit as jest.Mock).mockImplementation(() => ({
+      rest: {
+        pulls: {
+          requestReviewers: async (_request: any) => {},
+        },
+        issues: {
+          addAssignees: async (_request: any) => {},
+        },
+      },
+    }))
+
+    const client = github.getOctokit('token')
+    const requestReviewersSpy = jest.spyOn(
+      client.rest.pulls,
+      'requestReviewers'
+    )
+    const addAssigneesSpy = jest.spyOn(client.rest.issues, 'addAssignees')
+
+    await handler.handleIssue(client, context, {
+      addAssignees: false,
+      addReviewers: true,
+      reviewers: ['reviewer1'],
+    } as any)
+
+    expect(addAssigneesSpy).not.toBeCalled()
+    expect(requestReviewersSpy).not.toBeCalled()
+  })
+
+  test('no-ops successfully for issues when assignee groups are enabled but assignment is disabled', async () => {
+    ;(github.getOctokit as jest.Mock).mockImplementation(() => ({
+      rest: {
+        pulls: {
+          requestReviewers: async (_request: any) => {},
+        },
+        issues: {
+          addAssignees: async (_request: any) => {},
+        },
+      },
+    }))
+
+    const client = github.getOctokit('token')
+    const addAssigneesSpy = jest.spyOn(client.rest.issues, 'addAssignees')
+
+    await handler.handleIssue(client, context, {
+      addAssignees: false,
+      useAssigneeGroups: true,
+    } as any)
+
+    expect(addAssigneesSpy).not.toBeCalled()
+  })
+
+  test('skips issues that do not have any of the filterLabels.include labels', async () => {
+    const spy = jest.spyOn(core, 'info')
+    const client = github.getOctokit('token')
+
+    context.payload.issue!.labels = [{ name: 'bug' }]
+
+    await handler.handleIssue(client, context, {
+      addAssignees: true,
+      filterLabels: { include: ['triage'] },
+    } as any)
+
+    expect(spy.mock.calls[0][0]).toEqual(
+      'Skips the process to add assignees since issue is not tagged with any of the filterLabels.include'
+    )
+  })
+
+  test('skips issues that have any of the filterLabels.exclude labels', async () => {
+    const spy = jest.spyOn(core, 'info')
+    const client = github.getOctokit('token')
+
+    context.payload.issue!.labels = [{ name: 'wip' }]
+
+    await handler.handleIssue(client, context, {
+      addAssignees: true,
+      filterLabels: { exclude: ['wip'] },
+    } as any)
+
+    expect(spy.mock.calls[0][0]).toEqual(
+      'Skips the process to add assignees since issue is tagged with any of the filterLabels.exclude'
+    )
+  })
+
+  test('skips issues when the title includes skip keywords', async () => {
+    const spy = jest.spyOn(core, 'info')
+    const client = github.getOctokit('token')
+
+    context.payload.issue!.title = 'WIP issue test'
+
+    await handler.handleIssue(client, context, {
+      addAssignees: true,
+      skipKeywords: ['wip'],
+    } as any)
+
+    expect(spy.mock.calls[0][0]).toEqual(
+      'Skips the process to add assignees since issue title includes skip-keywords'
+    )
+  })
+
+  test('adds issue assignees from assignee groups', async () => {
+    ;(github.getOctokit as jest.Mock).mockImplementation(() => ({
+      rest: {
+        pulls: {
+          requestReviewers: async (_request: any) => {},
+        },
+        issues: {
+          addAssignees: async (_request: any) => {},
+        },
+      },
+    }))
+
+    const client = github.getOctokit('token')
+    const addAssigneesSpy = jest.spyOn(client.rest.issues, 'addAssignees')
+
+    await handler.handleIssue(client, context, {
+      addAssignees: true,
+      useAssigneeGroups: true,
+      numberOfAssignees: 1,
+      assigneeGroups: {
+        triage: ['issue-creator', 'assignee1'],
+        maintainers: ['assignee2'],
+      },
+    } as any)
+
+    expect(addAssigneesSpy.mock.calls[0][0]?.assignees).toEqual([
+      'assignee1',
+      'assignee2',
+    ])
+  })
+
+  test('warns on invalid addAssignees values for issues', async () => {
+    const spy = jest.spyOn(core, 'warning')
+    const client = github.getOctokit('token')
+
+    await handler.handleIssue(client, context, {
+      addAssignees: 'invalid',
+    } as any)
+
+    expect(spy.mock.calls[0][0]).toEqual(
+      "Error in configuration file to do with using addAssignees. Expected 'addAssignees' variable to be either boolean or 'author'"
+    )
+  })
+
+  test('warns without failing when issue assignee assignment fails', async () => {
+    ;(github.getOctokit as jest.Mock).mockImplementation(() => ({
+      rest: {
+        pulls: {
+          requestReviewers: async (_request: any) => {},
+        },
+        issues: {
+          addAssignees: async (_request: any) => {
+            throw new Error('failed to add issue assignees.')
+          },
+        },
+      },
+    }))
+
+    const spy = jest.spyOn(core, 'warning')
+    const client = github.getOctokit('token')
+
+    await handler.handleIssue(client, context, {
+      addAssignees: true,
+      assignees: ['assignee1'],
+      numberOfAssignees: 0,
+    } as any)
+
+    expect(spy.mock.calls[0][0]).toEqual('failed to add issue assignees.')
   })
 })

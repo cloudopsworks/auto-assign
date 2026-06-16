@@ -6,24 +6,13 @@ import { Client } from './types'
 
 type Context = typeof github.context
 
-export class PullRequest {
+export class Issue {
   private client: Client
   private context: Context
 
   constructor(client: Client, context: Context) {
     this.client = client
     this.context = context
-  }
-
-  async addReviewers(reviewers: string[]): Promise<void> {
-    const { owner, repo, number: pull_number } = this.context.issue
-    const result = await this.client.rest.pulls.requestReviewers({
-      owner,
-      repo,
-      pull_number,
-      reviewers,
-    })
-    core.debug(JSON.stringify(result))
   }
 
   async addAssignees(assignees: string[]): Promise<void> {
@@ -38,10 +27,11 @@ export class PullRequest {
   }
 
   hasAnyLabel(labels: string[]): boolean {
-    if (!this.context.payload.pull_request) {
+    if (!this.context.payload.issue) {
       return false
     }
-    const { labels: pullRequestLabels = [] } = this.context.payload.pull_request
-    return pullRequestLabels.some((label) => labels.includes(label.name))
+
+    const { labels: issueLabels = [] } = this.context.payload.issue
+    return issueLabels.some((label) => labels.includes(label.name))
   }
 }

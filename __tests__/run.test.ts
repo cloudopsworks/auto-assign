@@ -1,12 +1,19 @@
 import { mocked } from 'jest-mock'
 import * as core from '@actions/core'
-import * as github from '@actions/github'
 import { run } from '../src/run'
 import * as utils from '../src/utils'
 import * as handler from '../src/handler'
 
 jest.mock('@actions/core')
-jest.mock('@actions/github')
+jest.mock('@actions/github', () => ({
+  context: {},
+  getOctokit: jest.fn(),
+}))
+
+const github = jest.requireMock('@actions/github') as {
+  context: any
+  getOctokit: jest.Mock
+}
 jest.mock('../src/utils')
 jest.mock('../src/handler')
 
@@ -14,7 +21,7 @@ const mockedUtils = mocked(utils)
 const coreMocked = mocked(core)
 const mockedHandler = mocked(handler)
 
-describe.only('run', () => {
+describe('run', () => {
   beforeEach(() => {
     // @ts-ignore
     github.context = {
@@ -71,10 +78,10 @@ describe.only('run', () => {
       reviewers: ['reviewerA', 'reviewerB', 'reviewerC'],
     }))
 
-    mockedHandler.handlePullRequest.mockImplementation(async () => {})
+    mockedHandler.handleEvent.mockImplementation(async () => {})
 
     await run()
 
-    expect(mockedHandler.handlePullRequest).toBeCalled()
+    expect(mockedHandler.handleEvent).toBeCalled()
   })
 })
