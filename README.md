@@ -24,7 +24,7 @@ jobs:
   auto-assign:
     runs-on: ubuntu-latest
     steps:
-      - uses: cloudopsworks/auto-assign@v3
+      - uses: cloudopsworks/auto-assign@v3.0.1
         with:
           configuration-path: .github/auto_assign.yml # Optional; this is the default
 ```
@@ -69,6 +69,8 @@ Issues cannot request reviewers. On `issues` events, reviewer-only settings are 
 
 Assignment API errors are logged as warnings and do not fail the workflow.
 
+On pull requests, users selected as reviewers in the same run are removed from the assignee list before the assignment API call. The action does not backfill replacement assignees after that suppression, so the final assignee count can be lower than `numberOfAssignees`.
+
 ### Single reviewers/assignees list
 
 Add reviewers and/or assignees based on simple lists.
@@ -92,6 +94,7 @@ numberOfReviewers: 0
 
 # Pull requests and issues: GitHub usernames to assign.
 # For pull requests, this overrides the reviewer fallback when set.
+# For issues, reviewers are never used as fallback assignees.
 assignees:
   - assigneeA
   - assigneeB
@@ -138,6 +141,8 @@ assigneeGroups:
 ```
 
 When groups are used, the action chooses the configured number of users from each group, excluding the pull request creator or issue author.
+
+For pull requests, assignee groups follow the same reviewer suppression rule: if the same login was selected as a reviewer, it is not added as an assignee. No replacement user is selected after suppression.
 
 ### Assign the author
 
