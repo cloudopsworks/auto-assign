@@ -1,9 +1,14 @@
 import * as core from '@actions/core'
-import { Context } from '@actions/github/lib/context'
+import type * as github from '@actions/github' with {
+  'resolution-mode': 'import',
+}
 import * as utils from './utils'
 import { PullRequest } from './pull_request'
+import { Issue } from './issue'
 import { Client } from './types'
-import { PullRequestEvent } from '@octokit/webhooks-types'
+import { IssuesEvent, PullRequestEvent } from '@octokit/webhooks-types'
+
+type Context = typeof github.context
 
 export interface Config {
   addReviewers: boolean
@@ -22,6 +27,25 @@ export interface Config {
   reviewGroups: { [key: string]: string[] }
   assigneeGroups: { [key: string]: string[] }
   runOnDraft?: boolean
+}
+
+export async function handleEvent(
+  client: Client,
+  context: Context,
+  config: Config
+) {
+  if (
+    context.eventName === 'pull_request' ||
+    context.eventName === 'pull_request_target'
+  ) {
+    return handlePullRequest(client, context, config)
+  }
+
+  if (context.eventName === 'issues') {
+    return handleIssue(client, context, config)
+  }
+
+  throw new Error(`unsupported event: ${context.eventName}`)
 }
 
 export async function handlePullRequest(
@@ -119,6 +143,81 @@ export async function handlePullRequest(
       if (assignees.length > 0) {
         await pr.addAssignees(assignees)
         core.info(`Added assignees to PR #${number}: ${assignees.join(', ')}`)
+      }
+    } catch (error) {
+      if (error instanceof Error) {
+        core.warning(error.message)
+      }
+    }
+  }
+}
+
+export async function handleIssue(
+  client: Client,
+  context: Context,
+  config: Config
+) {
+  if (!context.payload.issue) {
+    throw new Error('the webhook payload is not exist')
+  }
+
+  const { issue: event } = context.payload as IssuesEvent
+  const { title, user, number } = event
+  const {
+    skipKeywords,
+    useAssigneeGroups,
+    assigneeGroups,
+    addAssignees,
+    filterLabels,
+  } = config
+
+  if (skipKeywords && utils.includesSkipKeywords(title, skipKeywords)) {
+    core.info(
+      'Skips the process to add assignees since issue title includes skip-keywords'
+    )
+    return
+  }
+
+  const owner = user.login
+  const issue = new Issue(client, context)
+
+  if (filterLabels !== undefined) {
+    if (filterLabels.include !== undefined && filterLabels.include.length > 0) {
+      const hasLabels = issue.hasAnyLabel(filterLabels.include)
+      if (!hasLabels) {
+        core.info(
+          'Skips the process to add assignees since issue is not tagged with any of the filterLabels.include'
+        )
+        return
+      }
+    }
+
+    if (filterLabels.exclude !== undefined && filterLabels.exclude.length > 0) {
+      const hasLabels = issue.hasAnyLabel(filterLabels.exclude)
+      if (hasLabels) {
+        core.info(
+          'Skips the process to add assignees since issue is tagged with any of the filterLabels.exclude'
+        )
+        return
+      }
+    }
+  }
+
+  if (addAssignees) {
+    if (useAssigneeGroups && !assigneeGroups) {
+      throw new Error(
+        "Error in configuration file to do with using review groups. Expected 'assigneeGroups' variable to be set because the variable 'useAssigneeGroups' = true."
+      )
+    }
+
+    try {
+      const assignees = utils.chooseIssueAssignees(owner, config)
+
+      if (assignees.length > 0) {
+        await issue.addAssignees(assignees)
+        core.info(
+          `Added assignees to issue #${number}: ${assignees.join(', ')}`
+        )
       }
     } catch (error) {
       if (error instanceof Error) {

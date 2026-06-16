@@ -1,12 +1,19 @@
 import {
   chooseUsers,
   chooseUsersFromGroups,
+  chooseIssueAssignees,
   includesSkipKeywords,
   fetchConfigurationFile,
 } from '../src/utils'
-import * as github from '@actions/github'
+jest.mock('@actions/github', () => ({
+  context: {},
+  getOctokit: jest.fn(),
+}))
 
-jest.mock('@actions/github')
+const github = jest.requireMock('@actions/github') as {
+  context: any
+  getOctokit: jest.Mock
+}
 
 describe('chooseUsers', () => {
   test('returns the reviewer list without the PR creator', () => {
@@ -56,6 +63,40 @@ describe('chooseUsers', () => {
     const list = chooseUsers(reviewers, numberOfReviewers)
 
     expect(list).toEqual(expect.arrayContaining(['pr-creator']))
+  })
+})
+
+describe('chooseIssueAssignees', () => {
+  test('uses the issue author when addAssignees is set to author', () => {
+    const list = chooseIssueAssignees('issue-creator', {
+      addAssignees: 'author',
+    } as any)
+
+    expect(list).toEqual(['issue-creator'])
+  })
+
+  test('does not fall back to reviewer-only configuration for issues', () => {
+    const list = chooseIssueAssignees('issue-creator', {
+      addAssignees: true,
+      reviewers: ['reviewer1'],
+      numberOfReviewers: 1,
+    } as any)
+
+    expect(list).toEqual([])
+  })
+
+  test('chooses issue assignees from assignee groups', () => {
+    const list = chooseIssueAssignees('issue-creator', {
+      addAssignees: true,
+      useAssigneeGroups: true,
+      numberOfAssignees: 1,
+      assigneeGroups: {
+        groupA: ['issue-creator', 'assignee1'],
+        groupB: ['assignee2'],
+      },
+    } as any)
+
+    expect(list).toEqual(['assignee1', 'assignee2'])
   })
 })
 

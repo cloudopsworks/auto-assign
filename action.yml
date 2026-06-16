@@ -1,14 +1,15 @@
 name: 'Auto Assign Action'
-description: 'Add reviewers to pull requests when pull requests are opened.'
+description: 'Add reviewers to pull requests and assignees to pull requests or issues.'
 author: 'Kentaro Matsushita'
 inputs:
   repo-token:
-    description: 'A token for the repo'
+    description: 'GitHub token. Requires contents: read plus pull-requests: write for reviewers and issues: write for assignees.'
     default: ${{ github.token }}
     required: false
   configuration-path:
-    description: 'A path for the auto-assign configuration'
+    description: 'Path to the auto-assign configuration file.'
     default: '.github/auto_assign.yml'
+    required: false
 runs:
   using: 'node24'
   main: 'dist/index.js'

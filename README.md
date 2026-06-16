@@ -1,167 +1,186 @@
 # Auto Assign Action
 
-An action which adds reviewers to the pull request when the pull request is opened.
+Auto Assign Action adds reviewers to pull requests and assignees to pull requests or issues when configured GitHub events run.
 
-## :arrow_forward: Usage
+## Usage
 
-Create a workflow (e.g. `.github/workflows/action.yml` For more detail, refer to [Configuring a workflow](https://help.github.com/en/articles/configuring-a-workflow#creating-a-workflow-file)) for running the auto-assign action.
+Create a workflow (for example, `.github/workflows/auto-assign.yml`) that runs the action for pull requests, issues, or both.
 
 ```yml
-name: 'Auto Assign'
+name: Auto Assign
+
 on:
   pull_request:
-    types: [opened, ready_for_review]
+    types: [opened, ready_for_review, reopened, labeled]
+  issues:
+    types: [opened, reopened, labeled]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
 
 jobs:
-  add-reviews:
+  auto-assign:
     runs-on: ubuntu-latest
     steps:
-      - uses: kentaro-m/auto-assign-action@v2.0.1
+      - uses: cloudopsworks/auto-assign@v3
         with:
-          configuration-path: '.github/some_name_for_configs.yml' # Only needed if you use something other than .github/auto_assign.yml
+          configuration-path: .github/auto_assign.yml # Optional; this is the default
 ```
 
-Change event that triggers a workflow to the `pull_request_target` if you want to enable the auto-assign action when opening pull requests from fork repositories or bots like Dependabot.
+The `labeled` issue trigger is recommended when you use `filterLabels.include` and want assignment to happen after a matching label is added to an existing issue.
 
-Using dangerous misuse of the `pull_request_target` event can be a security risk, so make sure you understand pros and cons before using it. 
+### Pull requests from forks or bots
 
-See below for details:
+Use `pull_request_target` instead of `pull_request` if you need to assign reviewers or assignees when pull requests are opened from forks or bots such as Dependabot.
 
-- [Events that trigger workflows / Pull request target - GitHub Docs](https://docs.github.com/en/actions/learn-github-actions/events-that-trigger-workflows#pull_request_target)
-- [Events that trigger workflows / Pull request events for forked repositories - GitHub Docs](https://docs.github.com/en/actions/learn-github-actions/events-that-trigger-workflows#pull-request-events-for-forked-repositories)
+Using `pull_request_target` incorrectly can be a security risk. Do not check out or execute untrusted pull request code from a `pull_request_target` workflow unless you fully understand the implications.
 
 ```diff
-name: 'Auto Assign'
+name: Auto Assign
  on:
 -  pull_request:
 +  pull_request_target:
-     types: [opened, ready_for_review]
-
- jobs:
+     types: [opened, ready_for_review, reopened, labeled]
 ```
 
-Create a separate configuration file for the auto-assign action (e.g. `.github/auto_assign.yml`).
+See GitHub's documentation for details:
 
-### Single Reviewers List
+- [Pull request target event](https://docs.github.com/en/actions/learn-github-actions/events-that-trigger-workflows#pull_request_target)
+- [Pull request events for forked repositories](https://docs.github.com/en/actions/learn-github-actions/events-that-trigger-workflows#pull-request-events-for-forked-repositories)
 
-Add reviewers/assignees to the pull request based on single reviewers list.
+Create an auto-assign configuration file such as `.github/auto_assign.yml`.
+
+## Configuration scope
+
+One configuration file can be shared by pull request and issue workflows.
+
+| Setting | Pull requests | Issues |
+| --- | --- | --- |
+| `addReviewers`, `reviewers`, `useReviewGroups`, `reviewGroups`, `numberOfReviewers` | Yes | Ignored |
+| `addAssignees`, `assignees`, `useAssigneeGroups`, `assigneeGroups`, `numberOfAssignees` | Yes | Yes |
+| `addAssignees: author` | PR creator | Issue author |
+| `filterLabels` | PR labels | Issue labels |
+| `skipKeywords` | PR title | Issue title |
+| `runOnDraft` | Yes | Ignored |
+
+Issues cannot request reviewers. On `issues` events, reviewer-only settings are ignored and only assignee behavior runs. If `addAssignees` is `false`, an issue run completes without making assignment API calls.
+
+Assignment API errors are logged as warnings and do not fail the workflow.
+
+### Single reviewers/assignees list
+
+Add reviewers and/or assignees based on simple lists.
 
 ```yaml
-# Set to true to add reviewers to pull requests
+# Pull requests only: add reviewers to pull requests.
 addReviewers: true
 
-# Set to true to add assignees to pull requests
-addAssignees: false
+# Pull requests and issues: add assignees.
+addAssignees: true
 
-# A list of reviewers to be added to pull requests (GitHub user name)
+# Pull requests only: GitHub usernames to request as reviewers.
 reviewers:
   - reviewerA
   - reviewerB
   - reviewerC
 
-# A number of reviewers added to the pull request
-# Set 0 to add all the reviewers (default: 0)
+# Pull requests only: number of reviewers to add.
+# Set to 0 to add all reviewers. Default: 0.
 numberOfReviewers: 0
-# A list of assignees, overrides reviewers if set
-# assignees:
-#   - assigneeA
 
-# A number of assignees to add to the pull request
-# Set to 0 to add all of the assignees.
-# Uses numberOfReviewers if unset.
-# numberOfAssignees: 2
+# Pull requests and issues: GitHub usernames to assign.
+# For pull requests, this overrides the reviewer fallback when set.
+assignees:
+  - assigneeA
+  - assigneeB
 
-# A list of keywords to be skipped the process that add reviewers if pull requests include it
-# skipKeywords:
-#   - wip
+# Pull requests and issues: number of assignees to add.
+# Set to 0 to add all assignees.
+# For pull requests only, numberOfReviewers is used when numberOfAssignees is unset.
+# For issues, unset numberOfAssignees defaults to 0.
+numberOfAssignees: 2
+
+# Pull requests and issues: skip when the title contains any keyword.
+skipKeywords:
+  - wip
 ```
 
-### Multiple Reviewers List
+### Multiple reviewer/assignee groups
 
-Add reviewers/assignees to the pull request based on multiple reviewers list.
-
-If you and peers work at the separate office or they work at the separate team by roles like frontend and backend, you might be good to use adding reviewers from each group.
+Select reviewers and/or assignees from multiple groups.
 
 ```yaml
-# Set to true to add reviewers to pull requests
+# Pull requests only.
 addReviewers: true
-
-# Set to true to add assignees to pull requests
-addAssignees: false
-
-# A number of reviewers added to the pull request
-# Set 0 to add all the reviewers (default: 0)
 numberOfReviewers: 1
-
-# A number of assignees to add to the pull request
-# Set to 0 to add all of the assignees.
-# Uses numberOfReviewers if unset.
-# numberOfAssignees: 2
-
-# Set to true to add reviewers from different groups to pull requests
 useReviewGroups: true
-
-# A list of reviewers, split into different groups, to be added to pull requests (GitHub user name)
 reviewGroups:
-  groupA:
+  frontend:
     - reviewerA
     - reviewerB
+  backend:
     - reviewerC
-  groupB:
     - reviewerD
-    - reviewerE
-    - reviewerF
 
-# Set to true to add assignees from different groups to pull requests
-useAssigneeGroups: false
-# A list of assignees, split into different froups, to be added to pull requests (GitHub user name)
-# assigneeGroups:
-#   groupA:
-#     - assigneeA
-#     - assigneeB
-#     - assigneeC
-#   groupB:
-#     - assigneeD
-#     - assigneeE
-#     - assigneeF
-
-# A list of keywords to be skipped the process that add reviewers if pull requests include it
-# skipKeywords:
-#   - wip
+# Pull requests and issues.
+addAssignees: true
+numberOfAssignees: 1
+useAssigneeGroups: true
+assigneeGroups:
+  triage:
+    - assigneeA
+    - assigneeB
+  maintainers:
+    - assigneeC
+    - assigneeD
 ```
 
-### Assign Author as Assignee
+When groups are used, the action chooses the configured number of users from each group, excluding the pull request creator or issue author.
 
-Add the PR creator as the assignee of the pull request.
+### Assign the author
+
+Assign the pull request creator or issue author.
 
 ```yaml
-# Set addAssignees to 'author' to set the PR creator as the assignee.
 addAssignees: author
 ```
 
 ### Filter by label
 
-The action will only run if the PR meets the specified filters
+Only run assignment when labels match the configured filters. For issue workflows, include the `labeled` activity type if labels may be added after issue creation.
 
 ```yaml
 filterLabels:
-  # Run
   include:
-    - my_label
-    - another_label
-  # Not run
+    - triage
+    - bug
   exclude:
     - wip
 ```
 
-### Filter draft PRs
+### Draft pull requests
 
-The action will only run for non-draft PRs. If you want to run for all PRs, you need to enable it to run on drafts.
+Draft filtering applies only to pull request events. It is ignored for issues.
 
 ```yaml
 runOnDraft: true
 ```
 
-## :memo: Licence
+## Permissions
+
+When using the default `github.token`, grant only the permissions your workflow needs:
+
+```yaml
+permissions:
+  contents: read        # Read the configuration file
+  pull-requests: write  # Request pull request reviewers
+  issues: write         # Assign issues and pull requests
+```
+
+If your workflow handles only issues, `pull-requests: write` is not required. If it handles only pull request reviewers, `issues: write` is still required when `addAssignees` is enabled because pull request assignees use GitHub's issue assignment API.
+
+## Licence
 
 MIT

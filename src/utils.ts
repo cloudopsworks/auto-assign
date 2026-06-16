@@ -62,6 +62,35 @@ export function chooseAssignees(owner: string, config: Config): string[] {
   return chosenAssignees
 }
 
+export function chooseIssueAssignees(owner: string, config: Config): string[] {
+  const { useAssigneeGroups, assigneeGroups, addAssignees } = config
+  const numberOfAssignees = config.numberOfAssignees ?? 0
+  const assignees = config.assignees ?? []
+  let chosenAssignees: string[] = []
+
+  const useGroups: boolean =
+    useAssigneeGroups && Object.keys(assigneeGroups).length > 0
+
+  if (typeof addAssignees === 'string') {
+    if (addAssignees !== 'author') {
+      throw new Error(
+        "Error in configuration file to do with using addAssignees. Expected 'addAssignees' variable to be either boolean or 'author'"
+      )
+    }
+    chosenAssignees = [owner]
+  } else if (useGroups) {
+    chosenAssignees = chooseUsersFromGroups(
+      owner,
+      assigneeGroups,
+      numberOfAssignees
+    )
+  } else {
+    chosenAssignees = chooseUsers(assignees, numberOfAssignees, owner)
+  }
+
+  return chosenAssignees
+}
+
 export function chooseUsers(
   candidates: string[],
   desiredNumber: number,
@@ -120,7 +149,7 @@ export async function fetchConfigurationFile(client: Client, options) {
   }
 
   const configString = Buffer.from(data.content, 'base64').toString()
-  const config = yaml.safeLoad(configString)
+  const config = yaml.load(configString) as Config
 
   return config
 }

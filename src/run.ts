@@ -1,10 +1,10 @@
 import * as core from '@actions/core'
-import * as github from '@actions/github'
 import * as utils from './utils'
 import * as handler from './handler'
 
 export async function run() {
   try {
+    const github = await import('@actions/github')
     const token = core.getInput('repo-token', { required: true })
     const configPath = core.getInput('configuration-path', {
       required: true,
@@ -19,10 +19,9 @@ export async function run() {
       ref: sha,
     })
 
-    await handler.handlePullRequest(client, github.context, config)
+    await handler.handleEvent(client, github.context, config)
   } catch (error) {
-    if (error instanceof Error) {
-      core.setFailed(error.message)
-    }
+    const message = error instanceof Error ? error.message : String(error)
+    core.setFailed(message)
   }
 }
