@@ -422,6 +422,88 @@ describe('handlePullRequest', () => {
     expect(requestReviewersSpy).not.toBeCalled()
   })
 
+  test('suppresses selected pull request reviewers from explicit assignees', async () => {
+    // MOCKS
+    ;(github.getOctokit as jest.Mock).mockImplementation(() => ({
+      rest: {
+        pulls: {
+          requestReviewers: async (_request: any) => {},
+        },
+        issues: {
+          addAssignees: async (_request: any) => {},
+        },
+      },
+    }))
+
+    const config = {
+      addAssignees: true,
+      addReviewers: true,
+      assignees: ['reviewer1', 'assignee1', 'Reviewer2'],
+      numberOfAssignees: 0,
+      numberOfReviewers: 0,
+      reviewers: ['reviewer1', 'reviewer2'],
+      skipKeywords: ['wip'],
+    } as any
+
+    const client = github.getOctokit('token')
+
+    const addAssigneesSpy = jest.spyOn(client.rest.issues, 'addAssignees')
+    const requestReviewersSpy = jest.spyOn(
+      client.rest.pulls,
+      'requestReviewers'
+    )
+
+    await handler.handlePullRequest(client, context, config)
+
+    expect(requestReviewersSpy.mock.calls[0][0]?.reviewers).toEqual([
+      'reviewer1',
+      'reviewer2',
+    ])
+    expect(addAssigneesSpy.mock.calls[0][0]?.assignees).toEqual(['assignee1'])
+  })
+
+  test('does not backfill or add pull request assignees when suppression removes every assignee', async () => {
+    // MOCKS
+    ;(github.getOctokit as jest.Mock).mockImplementation(() => ({
+      rest: {
+        pulls: {
+          requestReviewers: async (_request: any) => {},
+        },
+        issues: {
+          addAssignees: async (_request: any) => {},
+        },
+      },
+    }))
+
+    const config = {
+      addAssignees: true,
+      addReviewers: true,
+      assignees: ['reviewer1', 'reviewer2'],
+      numberOfAssignees: 0,
+      numberOfReviewers: 0,
+      reviewers: ['reviewer1', 'reviewer2'],
+      skipKeywords: ['wip'],
+    } as any
+
+    const client = github.getOctokit('token')
+
+    const addAssigneesSpy = jest.spyOn(client.rest.issues, 'addAssignees')
+    const requestReviewersSpy = jest.spyOn(
+      client.rest.pulls,
+      'requestReviewers'
+    )
+    const warningSpy = jest.spyOn(core, 'warning')
+
+    await handler.handlePullRequest(client, context, config)
+
+    expect(requestReviewersSpy.mock.calls[0][0]?.reviewers).toEqual([
+      'reviewer1',
+      'reviewer2',
+    ])
+    expect(addAssigneesSpy).not.toBeCalled()
+    expect(warningSpy).not.toBeCalled()
+  })
+
   test('adds assignees to pull requests using the numberOfReviewers when numberOfAssignees is unspecified', async () => {
     // MOCKS
     ;(github.getOctokit as jest.Mock).mockImplementation(() => ({

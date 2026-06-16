@@ -98,6 +98,7 @@ export async function handlePullRequest(
 
   const owner = user.login
   const pr = new PullRequest(client, context)
+  let reviewers: string[] = []
 
   if (filterLabels !== undefined) {
     if (filterLabels.include !== undefined && filterLabels.include.length > 0) {
@@ -123,7 +124,7 @@ export async function handlePullRequest(
 
   if (addReviewers) {
     try {
-      const reviewers = utils.chooseReviewers(owner, config)
+      reviewers = utils.chooseReviewers(owner, config)
 
       if (reviewers.length > 0) {
         await pr.addReviewers(reviewers)
@@ -138,7 +139,12 @@ export async function handlePullRequest(
 
   if (addAssignees) {
     try {
-      const assignees = utils.chooseAssignees(owner, config)
+      const reviewerLogins = new Set(
+        reviewers.map((reviewer) => reviewer.toLowerCase())
+      )
+      const assignees = utils
+        .chooseAssignees(owner, config)
+        .filter((assignee) => !reviewerLogins.has(assignee.toLowerCase()))
 
       if (assignees.length > 0) {
         await pr.addAssignees(assignees)
