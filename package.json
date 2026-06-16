@@ -1,6 +1,6 @@
 {
   "name": "auto-assign-action",
-  "version": "3.0.2",
+  "version": "3.0.3",
   "description": "Add reviewers to pull requests and assignees to pull requests or issues.",
   "repository": {
     "type": "git",
